@@ -1,0 +1,28 @@
+services:
+    rust-axum-with-google-oauth:
+        container_name: rust-axum-with-google-oauth
+        build:
+            context: .
+            network: net-di
+        ports:
+            - "127.0.0.1:3011:3011"
+        networks:
+            - "net-di"
+        restart: always
+        volumes:
+            - type: bind
+              source: ./.env
+              target: /opt/.env
+              read_only: true
+    mongo-server:
+        container_name: mongo-server
+        image: mongo
+        build:
+            context: .
+            network: net-di
+        networks:
+            - "net-di"
+        restart: always
+networks:
+    net-di:
+        name: "net-di"
