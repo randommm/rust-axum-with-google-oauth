@@ -1,10 +1,12 @@
 mod oauth;
 mod middlewares;
 mod pages;
+mod error_handling;
 
 use middlewares::{check_auth, inject_user_data};
 use oauth::{login, oauth_return, logout};
 use pages::{index, about, profile};
+use error_handling::AppError;
 
 use minijinja::Environment;
 
@@ -31,16 +33,19 @@ pub struct UserData {
     pub user_email: String,
 }
 
-pub async fn create_routes(database: Database) -> Router {
+pub async fn create_routes(database: Database) -> Result<Router, String> {
     let mut env = Environment::new();
     env.add_template("layout.html", include_str!("../templates/layout.html"))
-        .unwrap();
+        .map_err(|e| format!("Failed to add layout.html: {}", e))?;
+
     env.add_template("index.html", include_str!("../templates/index.html"))
-        .unwrap();
+        .map_err(|e| format!("Failed to add index.html: {}", e))?;
+
     env.add_template("about.html", include_str!("../templates/about.html"))
-        .unwrap();
+        .map_err(|e| format!("Failed to add about.html: {}", e))?;
+
     env.add_template("profile.html", include_str!("../templates/profile.html"))
-        .unwrap();
+        .map_err(|e| format!("Failed to add profile.html: {}", e))?;
 
     let app_state = AppState {
         database: database,
@@ -49,7 +54,7 @@ pub async fn create_routes(database: Database) -> Router {
 
     let user_data: Option<UserData> = None;
 
-    Router::new()
+    Ok(Router::new()
         .route("/profile", get(profile))
         .route_layer(middleware::from_fn_with_state(app_state.clone(), check_auth))
 
@@ -62,5 +67,5 @@ pub async fn create_routes(database: Database) -> Router {
         .route_layer(middleware::from_fn_with_state(app_state.clone(), inject_user_data))
 
         .with_state(app_state)
-        .layer(Extension(user_data))
+        .layer(Extension(user_data)))
 }

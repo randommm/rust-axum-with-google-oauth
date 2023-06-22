@@ -17,12 +17,19 @@ async fn mongo_connect(database_uri: String) -> mongodb::error::Result<Client> {
     Ok(client)
 }
 
-pub async fn run(database_uri: String) {
-    let client = mongo_connect(database_uri).await.unwrap();
+pub async fn run(database_uri: String) -> Result<(), String> {
+    let client = mongo_connect(database_uri).await.map_err(|e| {
+        format!("Failed to connect to MongoDB: {}", e)
+    })?;
     let database = client.database("axumApp");
-    let app = routes::create_routes(database).await;
-    axum::Server::bind(&"0.0.0.0:3011".parse().unwrap())
+    let app = routes::create_routes(database).await?;
+    let bind_addr = &"0.0.0.0:3011"
+        .parse()
+        .map_err(|e| { format!("Failed to parse address: {}", e) })?;
+    axum::Server::bind(bind_addr)
         .serve(app.into_make_service())
         .await
-        .unwrap();
+        .map_err(|e| {
+            format!("Server error: {}", e)
+        })
 }
