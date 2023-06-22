@@ -12,9 +12,10 @@ use oauth2::{
 };
 use dotenvy::var;
 use axum::{
-    extract::{Extension, State, Query, TypedHeader},
+    extract::{Extension, State, Query, TypedHeader, Host},
     headers::Cookie,
     response::{Redirect, IntoResponse},
+
 };
 
 use chrono::Utc;
@@ -24,7 +25,7 @@ use uuid::Uuid;
 
 use super::{UserData, AppError};
 
-fn get_client() -> Result<BasicClient, AppError> {
+fn get_client(hostname: String) -> Result<BasicClient, AppError> {
     let google_client_id = ClientId::new(
         var("GOOGLE_CLIENT_ID")?
     );
@@ -36,6 +37,14 @@ fn get_client() -> Result<BasicClient, AppError> {
     let token_url = TokenUrl::new("https://www.googleapis.com/oauth2/v3/token".to_string())
         .map_err(|_| "OAuth: invalid token endpoint URL")?;
 
+    let protocol = if hostname.starts_with("localhost") || hostname.starts_with("127.0.0.1") {
+        "http"
+    } else {
+        "https"
+    };
+
+    let redirect_url = format!("{}://{}/oauth_return", protocol, hostname).to_string();
+
     // Set up the config for the Google OAuth2 process.
     let client = BasicClient::new(
         google_client_id,
@@ -44,7 +53,8 @@ fn get_client() -> Result<BasicClient, AppError> {
         Some(token_url),
     )
     .set_redirect_uri(
-        RedirectUrl::new("http://localhost:3011/oauth_return".to_string()).map_err(|_| "OAuth: invalid redirect URL")?,
+        RedirectUrl::new(redirect_url)
+        .map_err(|_| "OAuth: invalid redirect URL")?,
     )
     .set_revocation_uri(
         RevocationUrl::new("https://oauth2.googleapis.com/revoke".to_string())
@@ -57,6 +67,7 @@ pub async fn login(
     Extension(user_data): Extension<Option<UserData>>,
     Query(mut params): Query<HashMap<String, String>>,
     State(database): State<Database>,
+    Host(hostname): Host
 ) -> Result<Redirect, AppError> {
 
     if user_data.is_some() { // check if already authenticated
@@ -66,7 +77,7 @@ pub async fn login(
     let return_url = params.remove("return_url").unwrap_or_else(|| "/".to_string());
     // TODO: check if return_url is valid
 
-    let client = get_client()?;
+    let client = get_client(hostname)?;
 
     let (pkce_code_challenge, pkce_code_verifier) = PkceCodeChallenge::new_random_sha256();
 
@@ -95,6 +106,7 @@ pub async fn login(
 pub async fn oauth_return(
     Query(mut params): Query<HashMap<String, String>>,
     State(database): State<Database>,
+    Host(hostname): Host
 ) -> Result<impl IntoResponse, AppError> {
 
     let state = CsrfToken::new(params.remove("state").ok_or("OAuth: without state")?);
@@ -110,7 +122,7 @@ pub async fn oauth_return(
     let pkce_code_verifier = PkceCodeVerifier::new(pkce_code_verifier);
 
     // Exchange the code with a token.
-    let client = get_client()?;
+    let client = get_client(hostname)?;
     let token_response = tokio::task::spawn_blocking(move || {
         client
         .exchange_code(code)
