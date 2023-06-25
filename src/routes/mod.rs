@@ -27,7 +27,7 @@ pub struct AppState {
     pub env: Environment<'static>,
 }
 
-#[derive(Clone, FromRef, Debug)]
+#[derive(Clone, Debug)]
 pub struct UserData {
     pub user_id: i32,
     pub user_email: String,
@@ -48,8 +48,8 @@ pub async fn create_routes(database: Database) -> Result<Router, String> {
         .map_err(|e| format!("Failed to add profile.html: {}", e))?;
 
     let app_state = AppState {
-        database: database,
-        env: env,
+        database,
+        env,
     };
 
     let user_data: Option<UserData> = None;

@@ -51,6 +51,6 @@ pub async fn check_auth<T>(
         Ok(next.run(request).await)
     } else {
         let login_url = "/login?return_url=".to_owned() + &*request.uri().to_string();
-        Ok(Redirect::to(&*login_url).into_response())
+        Ok(Redirect::to(login_url.as_str()).into_response())
     }
 }

@@ -43,7 +43,7 @@ fn get_client(hostname: String) -> Result<BasicClient, AppError> {
         "https"
     };
 
-    let redirect_url = format!("{}://{}/oauth_return", protocol, hostname).to_string();
+    let redirect_url = format!("{}://{}/oauth_return", protocol, hostname);
 
     // Set up the config for the Google OAuth2 process.
     let client = BasicClient::new(
@@ -100,7 +100,7 @@ pub async fn login(
             None,
         ).await?;
 
-    Ok(Redirect::to(&*authorize_url.to_string()))
+    Ok(Redirect::to(authorize_url.as_str()))
 }
 
 pub async fn oauth_return(
@@ -139,7 +139,7 @@ pub async fn oauth_return(
     .await.map_err(|_| "OAuth: reqwest failed to query userinfo")?
     .text()
     .await.map_err(|_| "OAuth: reqwest received invalid userinfo")?;
-    let mut body: serde_json::Value = serde_json::from_str(&*body).map_err(|_| "OAuth: Serde failed to parse userinfo")?;
+    let mut body: serde_json::Value = serde_json::from_str(body.as_str()).map_err(|_| "OAuth: Serde failed to parse userinfo")?;
     let email = body["email"].take().as_str().ok_or("OAuth: Serde failed to parse email address")?.to_owned();
     let verified_email = body["verified_email"].take().as_bool().ok_or("OAuth: Serde failed to parse verified_email")?;
     if !verified_email {
@@ -201,7 +201,7 @@ pub async fn oauth_return(
         None,
     ).await?;
 
-    Ok((headers, Redirect::to(&*return_url)))
+    Ok((headers, Redirect::to(return_url.as_str())))
 }
 
 pub async fn logout(
