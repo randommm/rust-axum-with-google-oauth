@@ -45,3 +45,37 @@ Minijinja is also used as the HTML template system. Moreover, a deployment examp
 * Build your OCI (Docker image) with `docker build -t ghcr.io/randommm/rust-axum-with-google-oauth .`.
 
 * Deploy with `docker run --env DATABASE_URI="mongodb://127.0.0.1:27017/" --env GOOGLE_CLIENT_ID=your_google_oauth_id --env GOOGLE_CLIENT_SECRET=your_google_oauth_secret --rm -p 3011:3011 --net host ghcr.io/randommm/rust-axum-with-google-oauth`, then just browse your website at `http://localhost:3011`.
+
+## Optional extra: production deploy with Nginx
+
+You can additional deploy on Nginx by adding the following to its configuration file (generally located at `/etc/nginx/sites-available/default`):
+
+      server {
+            server_name youdomainname.com;
+            listen 80;
+            location / {
+                  proxy_pass http://127.0.0.1:3011;
+                  proxy_set_header        Host $host;
+            }
+      }
+
+Additionally, you can obtain an SSL certificate by running `certbot --nginx`
+
+## Optional extra: automate deploy Github Actions
+
+Generate a new token (classic) at https://github.com/settings/tokens/new with `read:packages` permission. Login to the GH Docker registry at your server with `docker login ghcr.io`.
+
+Now, place `docker-compose.yml` on your server along with the `.env` and edit the `docker-compose.yml`, change:
+
+      container_name: rust-axum-with-google-oauth
+      build:
+          context: .
+
+to:
+
+      container_name: rust-axum-with-google-oauth
+      image:  ghcr.io/put_your_github_username_here/rust-axum-with-google-oauth
+
+Finally, edit your crontab (`crontab -e`) to auto check, pull and deploy changes every 5 minutes:
+
+      */5 * * * * cd /folder_where_docker-compose.yml_is_located/ && /usr/bin/docker-compose pull && /usr/bin/docker-compose up -d
