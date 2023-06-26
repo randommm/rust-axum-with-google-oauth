@@ -6,6 +6,12 @@ The underling database used is MongoDB, but it should be relativelly straighforw
 
 Minijinja is also used as the HTML template system. Moreover, a deployment example with GitHub Actions is provided.
 
+## Live Demo
+
+A live demo of this template is available at:
+
+https://rust-oauth.marcoinacio.com/
+
 ## Conventional setup
 
 * Get an OAuth Client ID and key at https://console.cloud.google.com/apis/credentials, setup `http://localhost:3011/oauth_return` as an authorised redirect URI.
