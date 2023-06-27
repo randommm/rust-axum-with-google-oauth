@@ -29,10 +29,10 @@ COPY Cargo.lock Cargo.lock
 
 RUN mkdir src && echo "fn main() {}" > src/main.rs
 
-RUN cargo build --release
+RUN cargo build --release --locked
 
 RUN rm -rf src
 
 COPY src src
 
-CMD cargo run --release
+CMD cargo run --release --locked
