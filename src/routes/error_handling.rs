@@ -1,6 +1,6 @@
 use axum::{
-    response::{Html, IntoResponse},
     http::StatusCode,
+    response::{Html, IntoResponse},
 };
 
 pub struct AppError {
@@ -50,7 +50,9 @@ impl IntoResponse for AppError {
                     <p>{}</p>
                 </body>
                 </html>
-                "#, self.user_message))
+                "#,
+                self.user_message
+            )),
         )
             .into_response()
     }

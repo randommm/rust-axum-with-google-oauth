@@ -1,25 +1,18 @@
-mod oauth;
-mod middlewares;
-mod pages;
 mod error_handling;
+mod middlewares;
+mod oauth;
+mod pages;
 
-use middlewares::{check_auth, inject_user_data};
-use oauth::{login, oauth_return, logout};
-use pages::{index, about, profile};
 use error_handling::AppError;
+use middlewares::{check_auth, inject_user_data};
+use oauth::{login, logout, oauth_return};
+use pages::{about, index, profile};
 
 use minijinja::Environment;
 
-use axum::{
-    extract::FromRef,
-    middleware,
-    routing::get,
-    Router,
-    Extension,
-};
+use axum::{extract::FromRef, middleware, routing::get, Extension, Router};
 
 use mongodb::Database;
-
 
 #[derive(Clone, FromRef)]
 pub struct AppState {
@@ -47,25 +40,25 @@ pub async fn create_routes(database: Database) -> Result<Router, String> {
     env.add_template("profile.html", include_str!("../templates/profile.html"))
         .map_err(|e| format!("Failed to add profile.html: {}", e))?;
 
-    let app_state = AppState {
-        database,
-        env,
-    };
+    let app_state = AppState { database, env };
 
     let user_data: Option<UserData> = None;
 
     Ok(Router::new()
         .route("/profile", get(profile))
-        .route_layer(middleware::from_fn_with_state(app_state.clone(), check_auth))
-
+        .route_layer(middleware::from_fn_with_state(
+            app_state.clone(),
+            check_auth,
+        ))
         .route("/", get(index))
         .route("/about", get(about))
         .route("/login", get(login))
         .route("/oauth_return", get(oauth_return))
         .route("/logout", get(logout))
-
-        .route_layer(middleware::from_fn_with_state(app_state.clone(), inject_user_data))
-
+        .route_layer(middleware::from_fn_with_state(
+            app_state.clone(),
+            inject_user_data,
+        ))
         .with_state(app_state)
         .layer(Extension(user_data)))
 }

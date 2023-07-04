@@ -1,12 +1,12 @@
 use axum::{
     extract::{Extension, State},
-    response::{Html, IntoResponse},
     http::Request,
+    response::{Html, IntoResponse},
 };
 
 use minijinja::{context, Environment};
 
-use super::{UserData, AppError};
+use super::{AppError, UserData};
 
 pub async fn index<T>(
     Extension(user_data): Extension<Option<UserData>>,
@@ -28,7 +28,6 @@ pub async fn about<T>(
     State(env): State<Environment<'static>>,
     request: Request<T>,
 ) -> Result<impl IntoResponse, AppError> {
-
     let tmpl = env.get_template("about.html")?;
     let user_email = user_data.map(|s| s.user_email);
     let login_return_url = "?return_url=".to_owned() + &*request.uri().to_string();
@@ -42,7 +41,7 @@ pub async fn about<T>(
 pub async fn profile(
     Extension(user_data): Extension<Option<UserData>>,
     State(env): State<Environment<'static>>,
-) -> Result<impl IntoResponse, AppError>{
+) -> Result<impl IntoResponse, AppError> {
     let tmpl = env.get_template("profile.html")?;
     let user_email = user_data.map(|s| s.user_email);
     let content = tmpl.render(context!(user_email => user_email))?;
