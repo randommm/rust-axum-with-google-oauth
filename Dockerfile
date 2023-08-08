@@ -21,6 +21,8 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s - -y
 
 ENV PATH=/root/.cargo/bin:${PATH}
 
+RUN cargo install sqlx-cli
+
 WORKDIR /opt
 
 COPY Cargo.toml Cargo.toml
@@ -35,4 +37,8 @@ RUN rm -rf src
 
 COPY src src
 
-CMD cargo run --release --locked
+RUN cargo build --release --locked
+
+COPY migrations migrations
+
+CMD sqlx database create && sqlx migrate run && cargo run --release --locked

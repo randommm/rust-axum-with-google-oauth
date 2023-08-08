@@ -70,15 +70,9 @@ impl From<dotenvy::Error> for AppError {
     }
 }
 
-impl From<mongodb::error::Error> for AppError {
-    fn from(err: mongodb::error::Error) -> Self {
-        AppError::new(format!("MongoDB query error: {:#}", err))
-    }
-}
-
-impl From<mongodb::bson::document::ValueAccessError> for AppError {
-    fn from(err: mongodb::bson::document::ValueAccessError) -> Self {
-        AppError::new(format!("MongoDB Value access error: {:#}", err))
+impl From<sqlx::Error> for AppError {
+    fn from(err: sqlx::Error) -> Self {
+        AppError::new(format!("Database query error: {:#}", err))
     }
 }
 

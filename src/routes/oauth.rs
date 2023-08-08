@@ -17,10 +17,7 @@ use oauth2::{
 };
 
 use chrono::Utc;
-use mongodb::{
-    bson::{doc, Document},
-    Database,
-};
+use sqlx::SqlitePool;
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -60,7 +57,7 @@ fn get_client(hostname: String) -> Result<BasicClient, AppError> {
 pub async fn login(
     Extension(user_data): Extension<Option<UserData>>,
     Query(mut params): Query<HashMap<String, String>>,
-    State(database): State<Database>,
+    State(db_pool): State<SqlitePool>,
     Host(hostname): Host,
 ) -> Result<Redirect, AppError> {
     if user_data.is_some() {
@@ -85,48 +82,47 @@ pub async fn login(
         .set_pkce_challenge(pkce_code_challenge)
         .url();
 
-    // save csrf_state and pkce_code_verifier to database
-    database
-        .collection::<Document>("oauth2_state_storage")
-        .insert_one(
-            doc! {
-                "csrf_state": csrf_state.secret(),
-                "pkce_code_verifier": pkce_code_verifier.secret(),
-                "return_url": return_url,
-            },
-            None,
-        )
-        .await?;
+    sqlx::query(
+        "INSERT INTO oauth2_state_storage (csrf_state, pkce_code_verifier, return_url) VALUES (?, ?, ?);",
+    )
+    .bind(csrf_state.secret())
+    .bind(pkce_code_verifier.secret())
+    .bind(return_url)
+    .execute(&db_pool)
+    .await?;
 
     Ok(Redirect::to(authorize_url.as_str()))
 }
 
 pub async fn oauth_return(
     Query(mut params): Query<HashMap<String, String>>,
-    State(database): State<Database>,
+    State(db_pool): State<SqlitePool>,
     Host(hostname): Host,
 ) -> Result<impl IntoResponse, AppError> {
     let state = CsrfToken::new(params.remove("state").ok_or("OAuth: without state")?);
     let code = AuthorizationCode::new(params.remove("code").ok_or("OAuth: without code")?);
 
-    // Given a csrf_state, get pkce_code_verifier and return_url from the database
-    let oauth2_state_storage = database
-        .collection::<Document>("oauth2_state_storage")
-        .find_one_and_delete(doc! { "csrf_state": state.secret() }, None)
-        .await?
-        .ok_or("OAuth: csrf_state not found on DB")?;
-    let pkce_code_verifier = oauth2_state_storage
-        .get("pkce_code_verifier")
-        .ok_or("OAuth: pkce_code_verifier not found on DB")?
-        .as_str()
-        .ok_or("OAuth: pkce_code_verifier is not a str on DB")?
-        .to_owned();
-    let return_url = oauth2_state_storage
-        .get("return_url")
-        .ok_or("OAuth: return_url not found on DB")?
-        .as_str()
-        .ok_or("OAuth: return_url is not a str on DB")?
-        .to_owned();
+    let query: (String, String) = sqlx::query_as(
+        r#"DELETE FROM oauth2_state_storage WHERE csrf_state = ? RETURNING pkce_code_verifier,return_url"#,
+    )
+    .bind(state.secret())
+    .fetch_one(&db_pool)
+    .await?;
+
+    // Alternative:
+    // let query: (String, String) = sqlx::query_as(
+    //     r#"SELECT pkce_code_verifier,return_url FROM oauth2_state_storage WHERE csrf_state = ?"#,
+    // )
+    // .bind(state.secret())
+    // .fetch_one(&db_pool)
+    // .await?;
+    // let _ = sqlx::query("DELETE FROM oauth2_state_storage WHERE csrf_state = ?")
+    //     .bind(state.secret())
+    //     .execute(&db_pool)
+    //     .await;
+
+    let pkce_code_verifier = query.0;
+    let return_url = query.1;
     let pkce_code_verifier = PkceCodeVerifier::new(pkce_code_verifier);
 
     // Exchange the code with a token.
@@ -169,39 +165,18 @@ pub async fn oauth_return(
 
     // Check if user exists in database
     // If not, create a new user
-    let user_id_query = database
-        .collection::<Document>("users")
-        .find_one(doc! { "email": &email }, None)
-        .await?;
-    let user_id = if let Some(user_id) = user_id_query {
-        user_id.get_i32("_id")?
+    let query: Result<(i64,), _> = sqlx::query_as(r#"SELECT id FROM users WHERE email=?"#)
+        .bind(email.as_str())
+        .fetch_one(&db_pool)
+        .await;
+    let user_id = if let Ok(query) = query {
+        query.0
     } else {
-        let user_id = database
-            .collection::<Document>("counters")
-            .find_one_and_update(
-                doc! {"_id": "users"},
-                doc! {"$inc": {"sequence_value":1}},
-                mongodb::options::FindOneAndUpdateOptions::builder()
-                    .upsert(true)
-                    .return_document(mongodb::options::ReturnDocument::After)
-                    .build(),
-            )
-            .await?
-            .ok_or("OAuth: failed to execute find_one_and_update for sequence_value for users")?
-            .get_i32("sequence_value")?;
-
-        database
-            .collection::<Document>("users")
-            .insert_one(
-                doc! {
-                    "email": &email,
-                    "_id": &user_id,
-                },
-                None,
-            )
+        let query: (i64,) = sqlx::query_as("INSERT INTO users (email) VALUES (?) RETURNING id")
+            .bind(email)
+            .fetch_one(&db_pool)
             .await?;
-
-        user_id
+        query.0
     };
 
     // Create a session for the user
@@ -211,32 +186,30 @@ pub async fn oauth_return(
         "session_token=".to_owned() + &*session_token,
     )]);
     let now = Utc::now().timestamp();
-    database
-        .collection::<Document>("user_sessions")
-        .insert_one(
-            doc! {
-                "session_token": session_token,
-                "user_id": user_id,
-                "created_at": now,
-                "expires_at": now + 60*60*24,
-            },
-            None,
-        )
-        .await?;
+
+    sqlx::query(
+        "INSERT INTO user_sessions (session_token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?);",
+    )
+    .bind(session_token)
+    .bind(user_id)
+    .bind(now)
+    .bind(now + 60*60*24)
+    .execute(&db_pool)
+    .await?;
 
     Ok((headers, Redirect::to(return_url.as_str())))
 }
 
 pub async fn logout(
     cookie: Option<TypedHeader<Cookie>>,
-    State(database): State<Database>,
+    State(db_pool): State<SqlitePool>,
 ) -> Result<impl IntoResponse, AppError> {
     if let Some(cookie) = cookie {
         if let Some(session_token) = cookie.get("session_token") {
-            database
-                .collection::<Document>("user_sessions")
-                .delete_many(doc! { "session_token": session_token}, None)
-                .await?;
+            let _ = sqlx::query("DELETE FROM user_sessions WHERE session_token = ?")
+                .bind(session_token)
+                .execute(&db_pool)
+                .await;
         }
     }
     let headers = axum::response::AppendHeaders([(

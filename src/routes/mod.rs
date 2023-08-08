@@ -12,21 +12,21 @@ use minijinja::Environment;
 
 use axum::{extract::FromRef, middleware, routing::get, Extension, Router};
 
-use mongodb::Database;
+use sqlx::SqlitePool;
 
 #[derive(Clone, FromRef)]
 pub struct AppState {
-    pub database: Database,
+    pub db_pool: SqlitePool,
     pub env: Environment<'static>,
 }
 
 #[derive(Clone, Debug)]
 pub struct UserData {
-    pub user_id: i32,
+    pub user_id: i64,
     pub user_email: String,
 }
 
-pub async fn create_routes(database: Database) -> Result<Router, String> {
+pub async fn create_routes(db_pool: SqlitePool) -> Result<Router, String> {
     let mut env = Environment::new();
     env.add_template("layout.html", include_str!("../templates/layout.html"))
         .map_err(|e| format!("Failed to add layout.html: {}", e))?;
@@ -40,7 +40,7 @@ pub async fn create_routes(database: Database) -> Result<Router, String> {
     env.add_template("profile.html", include_str!("../templates/profile.html"))
         .map_err(|e| format!("Failed to add profile.html: {}", e))?;
 
-    let app_state = AppState { database, env };
+    let app_state = AppState { db_pool, env };
 
     let user_data: Option<UserData> = None;
 

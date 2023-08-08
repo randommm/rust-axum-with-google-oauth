@@ -11,7 +11,7 @@ services:
               source: ./.env
               target: /opt/.env
               read_only: true
-    mongo-server:
-        container_name: mongo-server
-        image: mongo
-        restart: always
+            - type: bind
+              source: ./db
+              target: /opt/db
+              read_only: false
