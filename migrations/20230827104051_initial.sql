@@ -5,7 +5,8 @@ CREATE TABLE "users" (
 CREATE TABLE "user_sessions" (
     "id" integer NOT NULL PRIMARY KEY AUTOINCREMENT,
     "user_id" integer NOT NULL,
-    "session_token" text NOT NULL,
+    "session_token_p1" text NOT NULL,
+    "session_token_p2" text NOT NULL,
     "created_at" integer NOT NULL,
     "expires_at" integer NOT NULL
 );

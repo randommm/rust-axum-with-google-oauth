@@ -180,20 +180,27 @@ pub async fn oauth_return(
     };
 
     // Create a session for the user
-    let session_token = Uuid::new_v4().to_string();
+    let session_token_p1 = Uuid::new_v4().to_string();
+    let session_token_p2 = Uuid::new_v4().to_string();
+    let session_token = [session_token_p1.as_str(), "_", session_token_p2.as_str()].concat();
     let headers = axum::response::AppendHeaders([(
         axum::http::header::SET_COOKIE,
-        "session_token=".to_owned() + &*session_token,
+        "session_token=".to_owned()
+            + &*session_token
+            + "; path=/; httponly; secure; samesite=strict",
     )]);
     let now = Utc::now().timestamp();
 
     sqlx::query(
-        "INSERT INTO user_sessions (session_token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?);",
+        "INSERT INTO user_sessions
+        (session_token_p1, session_token_p2, user_id, created_at, expires_at)
+        VALUES (?, ?, ?, ?, ?);",
     )
-    .bind(session_token)
+    .bind(session_token_p1)
+    .bind(session_token_p2)
     .bind(user_id)
     .bind(now)
-    .bind(now + 60*60*24)
+    .bind(now + 60 * 60 * 24)
     .execute(&db_pool)
     .await?;
 
@@ -206,8 +213,9 @@ pub async fn logout(
 ) -> Result<impl IntoResponse, AppError> {
     if let Some(cookie) = cookie {
         if let Some(session_token) = cookie.get("session_token") {
-            let _ = sqlx::query("DELETE FROM user_sessions WHERE session_token = ?")
-                .bind(session_token)
+            let session_token: Vec<&str> = session_token.split('_').collect();
+            let _ = sqlx::query("DELETE FROM user_sessions WHERE session_token_1 = ?")
+                .bind(session_token[0])
                 .execute(&db_pool)
                 .await;
         }
