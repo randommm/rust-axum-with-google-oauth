@@ -214,6 +214,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "constant_time_eq"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f7144d30dcf0fafbce74250a3963025d8d52177934239851c917d29f1df280c2"
+
+[[package]]
 name = "convert_case"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1411,11 +1417,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "rust-axum-with-google-oauth"
-version = "0.1.0"
+name = "rust-axum-with-google-oauth-mongodb"
+version = "0.2.0"
 dependencies = [
  "axum",
  "chrono",
+ "constant_time_eq",
  "dotenvy",
  "minijinja",
  "mongodb",

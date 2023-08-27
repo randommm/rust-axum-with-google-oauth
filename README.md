@@ -20,7 +20,7 @@ https://rust-oauth.marcoinacio.com/
 
 * Create file named `.env` at the root of the repository (same folder as the README.md), containing:
 
-      DATABASE_URI="mongodb://localhost:27017/"
+      DATABASE_URL="mongodb://localhost:27017/"
       GOOGLE_CLIENT_ID=your_google_oauth_id
       GOOGLE_CLIENT_SECRET=your_google_oauth_secret
 
@@ -34,7 +34,7 @@ https://rust-oauth.marcoinacio.com/
 
 * Create file named `.env` at the root of the repository (same folder as the README.md), containing:
 
-      DATABASE_URI="mongodb://mongo-server/27017/"
+      DATABASE_URL="mongodb://mongo-server/27017/"
       GOOGLE_CLIENT_ID=your_google_oauth_id
       GOOGLE_CLIENT_SECRET=your_google_oauth_secret
 
@@ -50,7 +50,7 @@ https://rust-oauth.marcoinacio.com/
 
 * Build your OCI (Docker image) with `docker build -t ghcr.io/randommm/rust-axum-with-google-oauth .`.
 
-* Deploy with `docker run --env DATABASE_URI="mongodb://127.0.0.1:27017/" --env GOOGLE_CLIENT_ID=your_google_oauth_id --env GOOGLE_CLIENT_SECRET=your_google_oauth_secret --rm -p 3011:3011 --net host ghcr.io/randommm/rust-axum-with-google-oauth`, then just browse your website at `http://localhost:3011`.
+* Deploy with `docker run --env DATABASE_URL="mongodb://127.0.0.1:27017/" --env GOOGLE_CLIENT_ID=your_google_oauth_id --env GOOGLE_CLIENT_SECRET=your_google_oauth_secret --rm -p 3011:3011 --net host ghcr.io/randommm/rust-axum-with-google-oauth`, then just browse your website at `http://localhost:3011`.
 
 ## Optional extra: production deploy with Nginx
 
