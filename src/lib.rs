@@ -1,7 +1,7 @@
 mod routes;
 use sqlx::sqlite::SqlitePoolOptions;
 
-pub async fn run(database_url: String) -> Result<(), String> {
+pub async fn run(database_url: String) -> Result<(), Box<dyn std::error::Error>> {
     let db_pool = SqlitePoolOptions::new()
         .max_connections(5)
         .connect(database_url.as_str())
@@ -15,5 +15,6 @@ pub async fn run(database_url: String) -> Result<(), String> {
     axum::Server::bind(bind_addr)
         .serve(app.into_make_service())
         .await
-        .map_err(|e| format!("Server error: {}", e))
+        .map_err(|e| format!("Server error: {}", e))?;
+    Ok(())
 }

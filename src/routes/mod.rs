@@ -8,11 +8,10 @@ use middlewares::{check_auth, inject_user_data};
 use oauth::{login, logout, oauth_return};
 use pages::{about, index, profile};
 
-use minijinja::Environment;
-
 use axum::{extract::FromRef, middleware, routing::get, Extension, Router};
-
+use minijinja::Environment;
 use sqlx::SqlitePool;
+use std::fs;
 
 #[derive(Clone, FromRef)]
 pub struct AppState {
@@ -26,19 +25,18 @@ pub struct UserData {
     pub user_email: String,
 }
 
-pub async fn create_routes(db_pool: SqlitePool) -> Result<Router, String> {
+pub async fn create_routes(db_pool: SqlitePool) -> Result<Router, Box<dyn std::error::Error>> {
     let mut env = Environment::new();
-    env.add_template("layout.html", include_str!("../templates/layout.html"))
-        .map_err(|e| format!("Failed to add layout.html: {}", e))?;
 
-    env.add_template("index.html", include_str!("../templates/index.html"))
-        .map_err(|e| format!("Failed to add index.html: {}", e))?;
-
-    env.add_template("about.html", include_str!("../templates/about.html"))
-        .map_err(|e| format!("Failed to add about.html: {}", e))?;
-
-    env.add_template("profile.html", include_str!("../templates/profile.html"))
-        .map_err(|e| format!("Failed to add profile.html: {}", e))?;
+    let paths = fs::read_dir("src/templates").unwrap();
+    for path in paths {
+        let path = path.map_err(|e| format!("Error on file {e}"))?.path();
+        let source = fs::read_to_string(&path)?;
+        let path = path.to_str().ok_or("Failed to convert path to str")?;
+        let path = &path[14..];
+        env.add_template_owned(path.to_owned(), source)
+            .map_err(|e| format!("Failed to add {path}: {e}"))?;
+    }
 
     let app_state = AppState { db_pool, env };
 
