@@ -4,8 +4,9 @@ version = "0.2.1"
 edition = "2021"
 
 [dependencies]
-
-axum = { version = "0.6.1", features = ["headers", "macros"] }
+axum = { version = "0.7", features = ["macros"] }
+axum-extra = { version = "0.9", features = ["typed-header"] }
+headers = "0.4"
 chrono = { version = "0.4.23", features = ["serde"] }
 serde = { version = "1.0.147", features = ["derive"] }
 serde_json = "1.0"
