@@ -2,7 +2,7 @@
 
 You can use this repo as a template for OAuth authentication using Axum and Google OAuth.
 
-The underling database used is SQLite using SQLx, see branch the mongodb for a MongoDB version.
+The underling database used is SQLite using SQLx. For a MongoDB version, see https://github.com/randommm/rust-axum-with-google-oauth-mongodb.
 
 Minijinja is also used as the HTML template system. Moreover, a deployment example with GitHub Actions is provided.
 
