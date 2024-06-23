@@ -21,6 +21,7 @@ pub struct AppState {
 
 #[derive(Clone, Debug)]
 pub struct UserData {
+    #[allow(dead_code)]
     pub user_id: i64,
     pub user_email: String,
 }
