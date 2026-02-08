@@ -12,7 +12,7 @@ serde = { version = "1.0.147", features = ["derive"] }
 serde_json = "1.0"
 serde_with = "3.0.0"
 tokio = { version = "1.21.2", features = ["full"] }
-sqlx = { version = "0.7", features = ["sqlite", "runtime-tokio"] }
+sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio"] }
 minijinja = { version = "2", features = ["loader"] }
 oauth2 = "4.4.1"
 uuid = { version = "1.3", features = ["v4"] }
