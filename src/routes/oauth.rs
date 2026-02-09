@@ -5,16 +5,16 @@
 // GOOGLE_CLIENT_SECRET=yyy
 
 use axum::{
-    extract::{Extension, Host, Query, State},
+    extract::{Extension, Query, State},
     response::{IntoResponse, Redirect},
 };
 use axum_extra::TypedHeader;
 use dotenvy::var;
-use headers::Cookie;
+use headers::{Cookie, Host};
 use oauth2::{
-    basic::BasicClient, reqwest::http_client, AuthUrl, AuthorizationCode, ClientId, ClientSecret,
-    CsrfToken, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, RevocationUrl, Scope,
-    TokenResponse, TokenUrl,
+    basic::BasicClient, reqwest, AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken,
+    PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, RevocationUrl, Scope, TokenResponse,
+    TokenUrl,
 };
 
 use chrono::Utc;
@@ -24,7 +24,23 @@ use uuid::Uuid;
 
 use super::{AppError, UserData};
 
-fn get_client(hostname: String) -> Result<BasicClient, AppError> {
+pub type CustomClient = oauth2::Client<
+    oauth2::StandardErrorResponse<oauth2::basic::BasicErrorResponseType>,
+    oauth2::StandardTokenResponse<oauth2::EmptyExtraTokenFields, oauth2::basic::BasicTokenType>,
+    oauth2::StandardTokenIntrospectionResponse<
+        oauth2::EmptyExtraTokenFields,
+        oauth2::basic::BasicTokenType,
+    >,
+    oauth2::StandardRevocableToken,
+    oauth2::StandardErrorResponse<oauth2::RevocationErrorResponseType>,
+    oauth2::EndpointSet,
+    oauth2::EndpointNotSet,
+    oauth2::EndpointNotSet,
+    oauth2::EndpointSet,
+    oauth2::EndpointSet,
+>;
+
+fn get_client(hostname: String) -> Result<CustomClient, AppError> {
     let google_client_id = ClientId::new(var("GOOGLE_CLIENT_ID")?);
     let google_client_secret = ClientSecret::new(var("GOOGLE_CLIENT_SECRET")?);
     let auth_url = AuthUrl::new("https://accounts.google.com/o/oauth2/v2/auth".to_string())
@@ -41,17 +57,17 @@ fn get_client(hostname: String) -> Result<BasicClient, AppError> {
     let redirect_url = format!("{}://{}/oauth_return", protocol, hostname);
 
     // Set up the config for the Google OAuth2 process.
-    let client = BasicClient::new(
-        google_client_id,
-        Some(google_client_secret),
-        auth_url,
-        Some(token_url),
-    )
-    .set_redirect_uri(RedirectUrl::new(redirect_url).map_err(|_| "OAuth: invalid redirect URL")?)
-    .set_revocation_uri(
-        RevocationUrl::new("https://oauth2.googleapis.com/revoke".to_string())
-            .map_err(|_| "OAuth: invalid revocation endpoint URL")?,
-    );
+    let client = BasicClient::new(google_client_id)
+        .set_client_secret(google_client_secret)
+        .set_auth_uri(auth_url)
+        .set_token_uri(token_url)
+        .set_redirect_uri(
+            RedirectUrl::new(redirect_url).map_err(|_| "OAuth: invalid redirect URL")?,
+        )
+        .set_revocation_url(
+            RevocationUrl::new("https://oauth2.googleapis.com/revoke".to_string())
+                .map_err(|_| "OAuth: invalid revocation endpoint URL")?,
+        );
     Ok(client)
 }
 
@@ -59,7 +75,7 @@ pub async fn login(
     Extension(user_data): Extension<Option<UserData>>,
     Query(mut params): Query<HashMap<String, String>>,
     State(db_pool): State<SqlitePool>,
-    Host(hostname): Host,
+    TypedHeader(hostname): TypedHeader<Host>,
 ) -> Result<Redirect, AppError> {
     if user_data.is_some() {
         // check if already authenticated
@@ -71,7 +87,7 @@ pub async fn login(
         .unwrap_or_else(|| "/".to_string());
     // TODO: check if return_url is valid
 
-    let client = get_client(hostname)?;
+    let client = get_client(hostname.to_string())?;
 
     let (pkce_code_challenge, pkce_code_verifier) = PkceCodeChallenge::new_random_sha256();
 
@@ -98,7 +114,7 @@ pub async fn login(
 pub async fn oauth_return(
     Query(mut params): Query<HashMap<String, String>>,
     State(db_pool): State<SqlitePool>,
-    Host(hostname): Host,
+    TypedHeader(hostname): TypedHeader<Host>,
 ) -> Result<impl IntoResponse, AppError> {
     let state = CsrfToken::new(params.remove("state").ok_or("OAuth: without state")?);
     let code = AuthorizationCode::new(params.remove("code").ok_or("OAuth: without code")?);
@@ -126,17 +142,20 @@ pub async fn oauth_return(
     let return_url = query.1;
     let pkce_code_verifier = PkceCodeVerifier::new(pkce_code_verifier);
 
+    let http_client = reqwest::ClientBuilder::new()
+        // Following redirects opens the client up to SSRF vulnerabilities.
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .expect("Client should build");
+
     // Exchange the code with a token.
-    let client = get_client(hostname)?;
-    let token_response = tokio::task::spawn_blocking(move || {
-        client
-            .exchange_code(code)
-            .set_pkce_verifier(pkce_code_verifier)
-            .request(http_client)
-    })
-    .await
-    .map_err(|_| "OAuth: exchange_code failure")?
-    .map_err(|_| "OAuth: tokio spawn blocking failure")?;
+    let client = get_client(hostname.to_string())?;
+    let token_response = client
+        .exchange_code(code)
+        .set_pkce_verifier(pkce_code_verifier)
+        .request_async(&http_client)
+        .await
+        .map_err(|_| "OAuth: exchange_code failure")?;
     let access_token = token_response.access_token().secret();
 
     // Get user info from Google
