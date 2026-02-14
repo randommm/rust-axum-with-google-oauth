@@ -18,7 +18,7 @@ https://rust-oauth.marcoinacio.com/
 
 * Create file named `.env` at the root of the repository (same folder as the README.md), containing:
 
-      DATABASE_URI=sqlite://db/db.sqlite3
+      DATABASE_URL=sqlite://db/db.sqlite3
       GOOGLE_CLIENT_ID=your_google_oauth_id
       GOOGLE_CLIENT_SECRET=your_google_oauth_secret
 
@@ -34,7 +34,7 @@ https://rust-oauth.marcoinacio.com/
 
 * Create file named `.env` at the root of the repository (same folder as the README.md), containing:
 
-      DATABASE_URI=sqlite://db/db.sqlite3
+      DATABASE_URL=sqlite://db/db.sqlite3
       GOOGLE_CLIENT_ID=your_google_oauth_id
       GOOGLE_CLIENT_SECRET=your_google_oauth_secret
 
